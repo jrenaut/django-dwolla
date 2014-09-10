@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 
-from distutils.core import setup
+import djdwolla
 
-setup(name='Distutils',
-      version='1.0',
-      description='Python Distribution Utilities',
-      author='Greg Ward',
-      author_email='gward@python.net',
-      url='http://www.python.org/sigs/distutils-sig/',
-      packages=['distutils', 'distutils.command'],
+setup(name='Django Dwolla',
+      version='0.0.1',
+      description='Django + Dwolla',
+      author='Benjamin Rosnick',
+      author_email='benrxv@gmail.com',
+      url='https://github.com/benrxv/django-dwolla',
+      packages=['djdwolla',],
      )
