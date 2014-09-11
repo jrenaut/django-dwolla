@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 import sys
+import os
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.utils import importlib
@@ -38,3 +39,9 @@ def load_path_attr(path):
     return attr
 
 DWOLLA_API_KEY = safe_settings.DWOLLA_API_KEY
+
+DWOLLA_SANDBOX = safe_settings.DWOLLA_SANDBOX
+
+def set_dwolla_env():
+    if DWOLLA_SANDBOX == True:
+        os.environ['DWOLLA_SANDBOX'] = str(DWOLLA_SANDBOX)
