@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-from .settings import set_dwolla_env
+from .auth import DWOLLA_ACCOUNT, DWOLLA_APP, DWOLLA_GATE
 from .managers import CustomerManager
-set_dwolla_env()
-
+from .tasks import send_funds
 from model_utils.models import TimeStampedModel
+from delorean import Delorean
 
 from django.conf import settings
 from django.utils.encoding import python_2_unicode_compatible
@@ -13,42 +13,40 @@ from django.utils import timezone
 from django.db import models
 from django_extensions.db.fields.encrypted import EncryptedCharField
 
-from dwolla import DwollaUser, DwollaClientApp, DwollaAPIError, DwollaGateway
-
-KEY = 'sandbox' if settings.DWOLLA_SANDBOX else 'production'
-DWOLLA_ACCOUNT = settings.DWOLLA_ACCOUNTS[KEY]
-
-dwolla_app = DwollaClientApp(DWOLLA_ACCOUNT['key'], DWOLLA_ACCOUNT['secret'])
-
-dwolla_user = DwollaUser(DWOLLA_ACCOUNT['token'])
 
 def dwolla_charge(sub):
-    # Instantiate DwollaGateway with API creds and redirect URL
-    # dwolla_gate = DwollaGateway(settings.DWOLLA_API_KEY, settings.DWOLLA_API_SECRET, 'http://localhost:5000/redirect')
-    dwolla_gate = DwollaGateway(DWOLLA_ACCOUNT['key'], DWOLLA_ACCOUNT['secret'], 'http://google.com')
-
     # Clear out any previous session
-    dwolla_gate.start_gateway_session()
+    DWOLLA_GATE.start_gateway_session()
 
     # Add a product to the purchase order
-    # dwolla_gate.add_gateway_product(str(sub.customer), float(sub.amount))
-    dwolla_gate.add_gateway_product('Devote.io subscription', 21.00)
+    # DWOLLA_GATE.add_gateway_product(str(sub.customer), float(sub.amount))
+    DWOLLA_GATE.add_gateway_product('Devote.io subscription', 21.00)
 
     # Generate a checkout URL; pass in the recipient's Dwolla ID
-    # url = dwolla_gate.get_gateway_URL(str(sub.customer))
-    url = dwolla_gate.get_gateway_URL(DWOLLA_ACCOUNT['user_id'])
+    # url = DWOLLA_GATE.get_gateway_URL(str(sub.customer))
+    url = DWOLLA_GATE.get_gateway_URL(DWOLLA_ACCOUNT['user_id'])
+    return url
 
-    print url
+
+def create_oauth_request_url():
+    """ Send users to this url to authorize us """
+    redirect_uri = "https://www.back2ursite.com/return"
+    scope = "send|balance|funding|transactions|accountinfofull"
+    authUrl = DWOLLA_APP.init_oauth_url(redirect_uri, scope)
+    return authUrl
+
 
 class DwollaObject(TimeStampedModel):
 
     class Meta:
         abstract = True
 
+
 @python_2_unicode_compatible
 class Customer(DwollaObject):
 
-    user = models.OneToOneField(getattr(settings, 'AUTH_USER_MODEL', 'auth.User'), null=True, related_name='dwolla_customer')
+    user = models.OneToOneField(getattr(settings, 'AUTH_USER_MODEL', 'auth.User'),
+                                null=True, related_name='dwolla_customer')
     token = models.CharField(max_length=100, null=True, blank=True)
     pin = EncryptedCharField(max_length=100, null=True, blank=True)
     card_fingerprint = models.CharField(max_length=200, blank=True)
@@ -60,6 +58,31 @@ class Customer(DwollaObject):
 
     def __str__(self):
         return unicode(self.user)
+
+    @classmethod
+    def get_or_create(cls, user):
+        try:
+            return Customer.objects.get(user=user), False
+        except Customer.DoesNotExist:
+            return cls.create(user), True
+
+    @classmethod
+    def create(cls, user):
+        cus = Customer.objects.create(user=user)
+        return cus
+
+    def refresh_token(self):
+        resp = DWOLLA_APP.refresh_auth(self.token)
+        self.token = resp['refresh_token']
+        self.save(update_fields=['token'])
+        return True
+
+    # def send_funds(self, amount, notes, pin=None, funds_source=None):
+    #     pin = pin or self.pin
+    #     dwolla_user = DwollaUser(self.token)
+    #     dwolla_user.send_funds(token, amount, DWOLLA_ACCOUNT['user_id'],
+    #                            pin, notes=notes, funds_source=funds_source)
+    #     return True
 
 
 class CurrentSubscription(TimeStampedModel):
@@ -124,6 +147,33 @@ class CurrentSubscription(TimeStampedModel):
     def get_plan(self):
         return Plan.objects.get(name=str(self.customer.user))
 
+    def charge_subscription(self):
+        if DWOLLA_ACCOUNT['refresh_token']:
+            self.customer.refresh_token()
+        cus = self.customer
+        send_funds.delay(cus.token, DWOLLA_ACCOUNT['user_id'],
+                         self.amount, cus.pin,
+                         "Devote.IO monthly subscription")
+
+    @classmethod
+    def get_or_create(cls, customer, amount=None):
+        try:
+            return CurrentSubscription.objects.get(customer=customer), False
+        except CurrentSubscription.DoesNotExist:
+            return cls.create(customer, amount), True
+
+    @classmethod
+    def create(cls, customer):
+        end = Delorean().next_month().truncate("month").datetime
+        current_sub = CurrentSubscription.objects.create(customer=customer, quantity=1,
+                                                         start=timezone.now(), status="active",
+                                                         current_period_end=end, amount=0,
+                                                         current_period_start=timezone.now())
+        return current_sub
+
+    def update(self, amount):
+        self.amount = amount
+        self.save(update_fields=['amount'])
 
 CURRENCIES = (
     ('usd', 'U.S. Dollars',),
@@ -213,3 +263,4 @@ class Plan(DwollaObject):
     # def stripe_plan(self):
     #     """Return the plan data from Stripe."""
     #     return stripe.Plan.retrieve(self.stripe_id)
+

@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Enter your Dwolla PIN</h1>
+<form action="." method="post">
+  {% csrf_token %}
+  <div {% if form.pin_auth.errors %} class="has-error" {% endif %}>
+      <label style="display:inline-block" class="control-label" for="id_pin_auth">{{ form.pin_auth }} By checking this box, I acknowledge that Devote.IO now has permission to transfer funds for my subscriptions on an ongoing monthly basis.  My PIN will be stored at Devote.IO (encrypted) along with the Dwolla OAuth token that I just authorized.</label>
+  </div>
+  <div class="row">
+    <div class="col-md-2">
+      <div class="input-group">
+	<span class="input-group-addon">PIN</span>
+	{{ form.pin }}
+      </div>
+      <br />
+      <button class="btn btn-block btn-warning" type="submit">Authorize</button>
+    </div>
+    <div class="col-md-10">
+      {{ form.errors }}
+    </div>
+  </div>
+</form>
+{% endblock content %}
