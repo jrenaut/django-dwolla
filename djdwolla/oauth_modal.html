@@ -1,0 +1,18 @@
+<div id="dwolla_modal" class="modal fade">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
+        <h4 class="modal-title">Authorize {{ site_name }} to access your Dwolla account</h4>
+      </div>
+      <div class="modal-body">
+	{{ site_name }} does not appear to have authorization to access your Dwolla account.  You either need to sign up for a Dwolla account, or give authorization.  You will be redirected to Dwolla in either case.
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+        <a href="https://www.dwolla.com" type="button" class="btn btn-info">Sign up</a>
+        <a id="dwolla_auth" href="{{ auth_url }}" type="button" class="btn btn-primary">Authorize</a>
+      </div>
+    </div><!-- /.modal-content -->
+  </div><!-- /.modal-dialog -->
+</div><!-- /.modal -->

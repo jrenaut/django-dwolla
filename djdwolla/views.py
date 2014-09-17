@@ -5,7 +5,7 @@ import json
 from django.views.generic.base import TemplateView
 from django.views import generic
 from django.http import HttpResponse
-from django.shortcuts import redirect
+from django.contrib.sites.models import Site
 from braces.views import CsrfExemptMixin
 from dwolla import DwollaUser
 from .auth import DWOLLA_APP, DWOLLA_ACCOUNT
@@ -37,23 +37,18 @@ class OAuthRedirectView(MyTemplateView):
     message = "Redirecting for Dwolla OAuth"
 
 
-class OAuthView(LoginRequiredMixin, generic.View):
+class OAuthView(LoginRequiredMixin, generic.TemplateView):
 
-    # template_name = "oauth_form.html"
+    template_name = "oauth_modal.html"
 
-    # def get_context_data(self, **kwargs):
-    #     data = super(OAuthView, self).get_context_data(**kwargs)
-    #     redirect_uri = DWOLLA_ACCOUNT['oauth_uri']
-    #     scope = "send|balance|funding|transactions|accountinfofull"
-    #     auth_url = DWOLLA_APP.init_oauth_url(redirect_uri, scope)
-    #     data['auth_url'] = auth_url
-    #     return data
-
-    def get(self, request, *args, **kwargs):
+    def get_context_data(self, **kwargs):
+        data = super(OAuthView, self).get_context_data(**kwargs)
         redirect_uri = DWOLLA_ACCOUNT['oauth_uri']
         scope = "send|balance|funding|transactions|accountinfofull"
         auth_url = DWOLLA_APP.init_oauth_url(redirect_uri, scope)
-        return HttpResponse(auth_url)
+        data['auth_url'] = auth_url
+        data['site_name'] = Site.objects.get().name
+        return data
 
 
 class OAuthConfirmationView(LoginRequiredMixin, generic.UpdateView):
