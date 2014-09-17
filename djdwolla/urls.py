@@ -26,8 +26,20 @@ urlpatterns = patterns("",
     ),
 
     url(
+        r"^oauth_setup/$",
+        views.OAuthView.as_view(),
+        name="oauth"
+    ),
+
+    url(
+        r"^oauth_redirect/$",
+        views.OAuthRedirectView.as_view(),
+        name="oauth_redirect"
+    ),
+
+    url(
         r"^payment_posted/$",
-        views.MyTemplateView.as_view(),
+        views.PaymentPostedView.as_view(),
         name="payment_posted"
     ),
 

@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+import traceback
+
 from .auth import DWOLLA_ACCOUNT, DWOLLA_APP, DWOLLA_GATE
 from .managers import CustomerManager
 from .tasks import send_funds
@@ -39,153 +41,47 @@ def create_oauth_request_url():
 
 class DwollaObject(TimeStampedModel):
 
-    dwolla_id = models.CharField(max_length=50, unique=True)
+    dwolla_id = models.CharField(max_length=50)
 
     class Meta:
         abstract = True
 
 
 @python_2_unicode_compatible
-class Event(DwollaObject):
+class EventProcessingException(TimeStampedModel):
 
-    """
-    kinds: Transaction.Status, Transaction.Returned,
-           Request.Fulfilled, Request.Cancelled
-    
-    """
-    kind = models.CharField(max_length=250)
-    livemode = models.BooleanField(default=False)
-    customer = models.ForeignKey("Customer", null=True)
-    webhook_message = JSONField()
-    validated_message = JSONField(null=True)
-    valid = models.NullBooleanField(null=True)
-    processed = models.BooleanField(default=False)
+    event = models.ForeignKey("RequestFulfilled", null=True)
+    data = models.TextField()
+    message = models.CharField(max_length=500)
+    traceback = models.TextField()
 
-    @property
-    def message(self):
-        return self.validated_message
+    @classmethod
+    def log(cls, data, exception, event):
+        cls.objects.create(
+            event=event,
+            data=data or "",
+            message=str(exception),
+            traceback=traceback.format_exc()
+        )
 
     def __str__(self):
-        return "%s - %s" % (self.kind, self.stripe_id)
+        return u"<%s, pk=%s, Event=%s>" % (self.message, self.pk, self.event)
 
-    def link_customer(self):
-        cus_id = None
-        customer_crud_events = [
-            "customer.created",
-            "customer.updated",
-            "customer.deleted"
-        ]
-        if self.kind in customer_crud_events:
-            cus_id = self.message["data"]["object"]["id"]
-        else:
-            cus_id = self.message["data"]["object"].get("customer", None)
 
-        if cus_id is not None:
-            try:
-                self.customer = Customer.objects.get(stripe_id=cus_id)
-                self.save()
-            except Customer.DoesNotExist:
-                pass
+class RequestFulfilled(TimeStampedModel):
 
-    def validate(self):
-        evt = stripe.Event.retrieve(self.stripe_id)
-        self.validated_message = json.loads(
-            json.dumps(
-                evt.to_dict(),
-                sort_keys=True,
-                cls=stripe.StripeObjectEncoder
-            )
-        )
-        if self.webhook_message["data"] == self.validated_message["data"]:
-            self.valid = True
-        else:
-            self.valid = False
-        self.save()
+    source_id = models.CharField(max_length=20)
+    destination_id = models.CharField(max_length=20)
+    amount = models.DecimalField(decimal_places=2, max_digits=7)
+    notes = models.TextField(blank=True, null=True)
+    transaction = JSONField()
+    metadata = JSONField(blank=True, null=True)
+    dwolla_fee = models.DecimalField(decimal_places=2, max_digits=4, null=True)
 
-    def process(self):
-        """
-            "account.updated",
-            "account.application.deauthorized",
-            "charge.succeeded",
-            "charge.failed",
-            "charge.refunded",
-            "charge.dispute.created",
-            "charge.dispute.updated",
-            "chagne.dispute.closed",
-            "customer.created",
-            "customer.updated",
-            "customer.deleted",
-            "customer.subscription.created",
-            "customer.subscription.updated",
-            "customer.subscription.deleted",
-            "customer.subscription.trial_will_end",
-            "customer.discount.created",
-            "customer.discount.updated",
-            "customer.discount.deleted",
-            "invoice.created",
-            "invoice.updated",
-            "invoice.payment_succeeded",
-            "invoice.payment_failed",
-            "invoiceitem.created",
-            "invoiceitem.updated",
-            "invoiceitem.deleted",
-            "plan.created",
-            "plan.updated",
-            "plan.deleted",
-            "coupon.created",
-            "coupon.updated",
-            "coupon.deleted",
-            "transfer.created",
-            "transfer.updated",
-            "transfer.failed",
-            "ping"
-        """
-        if self.valid and not self.processed:
-            try:
-                if not self.kind.startswith("plan.") and \
-                        not self.kind.startswith("transfer."):
-                    self.link_customer()
-                if self.kind.startswith("invoice."):
-                    Invoice.handle_event(self)
-                elif self.kind.startswith("charge."):
-                    if not self.customer:
-                        self.link_customer()
-                    self.customer.record_charge(
-                        self.message["data"]["object"]["id"]
-                    )
-                elif self.kind.startswith("transfer."):
-                    Transfer.process_transfer(
-                        self,
-                        self.message["data"]["object"]
-                    )
-                elif self.kind.startswith("customer.subscription."):
-                    if not self.customer:
-                        self.link_customer()
-                    if self.customer:
-                        self.customer.sync_current_subscription()
-                elif self.kind == "customer.deleted":
-                    if not self.customer:
-                        self.link_customer()
-                    self.customer.purge()
-                self.send_signal()
-                self.processed = True
-                self.save()
-            except stripe.StripeError as e:
-                EventProcessingException.log(
-                    data=e.http_body,
-                    exception=e,
-                    event=self
-                )
-                webhook_processing_error.send(
-                    sender=Event,
-                    data=e.http_body,
-                    exception=e
-                )
-
-    def send_signal(self):
-        signal = WEBHOOK_SIGNALS.get(self.kind)
-        if signal:
-            return signal.send(sender=Event, event=self)
+    def save(self, *args, **kwargs):
+        if self.amount > 10:
+            self.dwolla_fee = 0.25
+        super(RequestFulfilled, self).save(*args, **kwargs)
 
 
 @python_2_unicode_compatible
@@ -302,18 +198,18 @@ class CurrentSubscription(TimeStampedModel):
                          "Devote.IO monthly subscription")
 
     @classmethod
-    def get_or_create(cls, customer, amount=None):
+    def get_or_create(cls, customer, amount=0):
         try:
             return CurrentSubscription.objects.get(customer=customer), False
         except CurrentSubscription.DoesNotExist:
-            return cls.create(customer, amount), True
+            return cls.create(customer, amount=amount), True
 
     @classmethod
-    def create(cls, customer):
+    def create(cls, customer, amount=0):
         end = Delorean().next_month().truncate("month").datetime
         current_sub = CurrentSubscription.objects.create(customer=customer, quantity=1,
                                                          start=timezone.now(), status="active",
-                                                         current_period_end=end, amount=0,
+                                                         current_period_end=end, amount=amount,
                                                          current_period_start=timezone.now())
         return current_sub
 
