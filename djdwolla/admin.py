@@ -8,7 +8,7 @@ from django.contrib import admin
 from django.db.models.fields import FieldDoesNotExist
 
 # from .models import Event, EventProcessingException, Transfer, Charge
-from .models import CurrentSubscription, Customer, Plan #, Invoice, InvoiceItem 
+from .models import CurrentSubscription, Customer, Plan, TransactionStatus  # , Invoice, InvoiceItem 
 
 from .settings import User
 
@@ -175,6 +175,30 @@ def send_charge_receipt(modeladmin, request, queryset):
 #         "validated_message"
 #     ] + user_search_fields,
 # )
+
+admin.site.register(
+    TransactionStatus,
+    readonly_fields=('created',),
+    list_display=[
+        "dwolla_id",
+        "dtype",
+        "subtype",
+        "value",
+        "created"
+    ],
+    list_filter=[
+        "dtype",
+        "subtype",
+        "created",
+        "value",
+    ],
+    search_fields=[
+        "dwolla_id",
+        "value",
+        "customer__user__username",
+        "customer__user__email",
+    ] + user_search_fields,
+)
 
 
 class CurrentSubscriptionInline(admin.TabularInline):

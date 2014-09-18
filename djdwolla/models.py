@@ -68,6 +68,25 @@ class EventProcessingException(TimeStampedModel):
         return u"<%s, pk=%s, Event=%s>" % (self.message, self.pk, self.event)
 
 
+class TransactionStatus(DwollaObject):
+
+    dtype = models.CharField(max_length=20)
+    subtype = models.CharField(max_length=20)
+    value = models.CharField(max_length=20)
+    transaction = JSONField()
+    metadata = JSONField(blank=True, null=True)
+    source_id = models.CharField(max_length=20)
+    destination_id = models.CharField(max_length=20)
+    customer = models.ForeignKey("Customer", null=True)
+    amount = models.DecimalField(decimal_places=2, max_digits=7)
+    dwolla_fee = models.DecimalField(decimal_places=2, max_digits=4, null=True)
+
+    def save(self, *args, **kwargs):
+        if self.amount > 10:
+            self.dwolla_fee = 0.25
+        super(TransactionStatus, self).save(*args, **kwargs)
+
+
 class RequestFulfilled(TimeStampedModel):
 
     source_id = models.CharField(max_length=20)
@@ -194,7 +213,7 @@ class CurrentSubscription(TimeStampedModel):
             self.customer.refresh_token()
         cus = self.customer
         send_funds.delay(cus.token, DWOLLA_ACCOUNT['user_id'],
-                         self.amount, cus.pin,
+                         float(self.amount), cus.pin,
                          "Devote.IO monthly subscription")
 
     @classmethod

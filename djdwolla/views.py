@@ -12,7 +12,7 @@ from .auth import DWOLLA_APP, DWOLLA_ACCOUNT
 
 from .mixins import LoginRequiredMixin
 from .forms import PinForm
-from .models import Customer, RequestFulfilled, EventProcessingException
+from .models import Customer, TransactionStatus  # , RequestFulfilled, EventProcessingException
 from .settings import PY3
 
 
@@ -82,7 +82,33 @@ class OAuthConfirmationView(LoginRequiredMixin, generic.UpdateView):
         return {"pin": ""}
 
 
-class PaymentPostedView(CsrfExemptMixin, generic.View):
+class WebhookView(CsrfExemptMixin, generic.View):
+
+    def record_transaction(self, data):
+        data_dict = {
+            "dtype": data["Type"],
+            "subtype": data["Subtype"],
+            "value": data["Value"],
+            "transaction": data["Transaction"],
+            "dwolla_id": data["Id"],
+            "source_id": data["Transaction"]["Source"]["Id"],
+            "destination_id": data["Transaction"]["Destination"]["Id"],
+            "amount": data["Transaction"]["Amount"]
+        }
+        try:
+            c = Customer.objects.get(dwolla_id=data_dict["source_id"])
+        except Customer.DoesNotExist:
+            c = Customer.objects.get(dwolla_id=data_dict["destination_id"])
+        except Customer.DoesNotExist:
+            c = None
+        data_dict["customer"] = c
+        t, created = TransactionStatus.objects.get_or_create(
+            dwolla_id=data_dict['dwolla_id'],
+            defaults=data_dict
+        )
+        if not created:
+            t.value = data_dict['value']
+            t.save(update_fields=['value'])
 
     def post(self, request, *args, **kwargs):
         if PY3:
@@ -92,18 +118,21 @@ class PaymentPostedView(CsrfExemptMixin, generic.View):
             # Handles Python 2
             body = request.body
         data = json.loads(body)
-        if RequestFulfilled.objects.filter(dwolla_id=data["Id"]).exists():
-            EventProcessingException.objects.create(
-                data=data,
-                message="Duplicate event record",
-                traceback=""
-            )
-        else:
-            RequestFulfilled.objects.create(
-                dwolla_id=data["Id"],
-                source_id=data["Source"],
-                destination_id=data["Destination"],
-                transaction=data["Transaction"],
-                amount=data['Amount']
-            )
+        if data['Type'] == "Transaction":
+            self.record_transaction(data)
+        # if RequestFulfilled.objects.filter(dwolla_id=data["Id"]).exists():
+        #     EventProcessingException.objects.create(
+        #         data=data,
+        #         message="Duplicate event record",
+        #         traceback=""
+        #     )
+        # else:
+        #     RequestFulfilled.objects.create(
+        #         dwolla_id=data["Id"],
+        #         source_id=data["Source"],
+        #         destination_id=data["Destination"],
+        #         transaction=data["Transaction"],
+        #         amount=data['Amount']
+        #     )
         return HttpResponse()
+

@@ -38,9 +38,9 @@ urlpatterns = patterns("",
     ),
 
     url(
-        r"^payment_posted/$",
-        views.PaymentPostedView.as_view(),
-        name="payment_posted"
+        r"^webhook/$",
+        views.WebhookView.as_view(),
+        name="webhook"
     ),
 
     url(
