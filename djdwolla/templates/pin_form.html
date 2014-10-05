@@ -14,6 +14,9 @@
 	{{ form.pin }}
       </div>
       <br />
+      {% for f in form.hidden_fields %}
+      {{ f }}
+      {% endfor %}
       <button class="btn btn-block btn-warning" type="submit">Authorize</button>
     </div>
     <div class="col-md-10">

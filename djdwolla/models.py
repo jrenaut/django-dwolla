@@ -109,6 +109,7 @@ class Customer(DwollaObject):
     user = models.OneToOneField(getattr(settings, 'AUTH_USER_MODEL', 'auth.User'),
                                 null=True, related_name='dwolla_customer')
     token = models.CharField(max_length=100, null=True, blank=True)
+    refresh_token = models.CharField(max_length=100, null=True, blank=True)
     pin = EncryptedCharField(max_length=100, null=True, blank=True)
     card_fingerprint = models.CharField(max_length=200, blank=True)
     card_last_4 = models.CharField(max_length=4, blank=True)
@@ -132,10 +133,11 @@ class Customer(DwollaObject):
         cus = Customer.objects.create(user=user)
         return cus
 
-    def refresh_token(self):
-        resp = DWOLLA_APP.refresh_auth(self.token)
-        self.token = resp['refresh_token']
-        self.save(update_fields=['token'])
+    def update_tokens(self):
+        resp = DWOLLA_APP.refresh_auth(self.refresh_token)
+        self.refresh_token = resp['refresh_token']
+        self.token = resp['access_token']
+        self.save(update_fields=['token', 'refresh_token'])
         return True
 
     # def send_funds(self, amount, notes, pin=None, funds_source=None):
@@ -209,8 +211,7 @@ class CurrentSubscription(TimeStampedModel):
         return Plan.objects.get(name=str(self.customer.user))
 
     def charge_subscription(self):
-        if DWOLLA_ACCOUNT['refresh_token']:
-            self.customer.refresh_token()
+        self.customer.update_tokens()
         cus = self.customer
         send_funds.delay(cus.token, DWOLLA_ACCOUNT['user_id'],
                          float(self.amount), cus.pin,

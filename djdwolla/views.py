@@ -14,6 +14,9 @@ from .mixins import LoginRequiredMixin
 from .forms import PinForm
 from .models import Customer, TransactionStatus  # , RequestFulfilled, EventProcessingException
 from .settings import PY3
+from djstripe.models import Event, EventProcessingException
+import urllib
+from django.contrib import messages
 
 
 class MyTemplateView(TemplateView):
@@ -44,6 +47,8 @@ class OAuthView(LoginRequiredMixin, generic.TemplateView):
     def get_context_data(self, **kwargs):
         data = super(OAuthView, self).get_context_data(**kwargs)
         redirect_uri = DWOLLA_ACCOUNT['oauth_uri']
+        self.request.session['dwolla_oauth_next'] = self.request.GET['next']
+        print self.request.session.items()
         scope = "send|balance|funding|transactions|accountinfofull"
         auth_url = DWOLLA_APP.init_oauth_url(redirect_uri, scope)
         data['auth_url'] = auth_url
@@ -56,7 +61,7 @@ class OAuthConfirmationView(LoginRequiredMixin, generic.UpdateView):
     model = Customer
     template_name = "pin_form.html"
     form_class = PinForm
-    success_url = "/dwolla/pin_confirmed/"
+    # success_url = "/dwolla/pin_confirmed/"
 
     def get_object(self):
         if hasattr(self.request.user, "dwolla_customer"):
@@ -65,50 +70,71 @@ class OAuthConfirmationView(LoginRequiredMixin, generic.UpdateView):
             customer = Customer.create(self.request.user)
         return customer
 
-    def get(self, request, *args, **kwargs):
-        response = super(OAuthConfirmationView, self).get(request, *args, **kwargs)
+    def get_token(self):
         code = self.request.GET['code']
         dwolla_resp = DWOLLA_APP.get_oauth_token(code)
-        if type(dwolla_resp) is unicode:  # old dwolla api
-            token = dwolla_resp
-        else:  # new dwolla api as of Oct 2014
-            token = json.loads(dwolla_resp)['refresh_token']
-        self.object.token = token
-        self.object.dwolla_id = DwollaUser(token).get_account_info()['Id']
-        self.object.save(update_fields=['token', 'dwolla_id'])
-        return response
+        return dwolla_resp
+
+    def form_valid(self, form):
+        messages.info(self.request,
+                      "Your pin is confirmed, and your Dwolla account is now authorized.")
+        return super(OAuthConfirmationView, self).form_valid(form)
 
     def get_initial(self):
-        return {"pin": ""}
+        if self.request.method == "GET":
+            tokens = self.get_token()
+            access_token = tokens['access_token']
+            refresh_token = tokens['refresh_token']
+            dwolla_id = DwollaUser(access_token).get_account_info()['Id']
+            return {"pin": "", "token": access_token, "refresh_token": refresh_token, "dwolla_id": dwolla_id}
+        else:
+            return super(OAuthConfirmationView, self).get_initial()
+
+    def get_success_url(self):
+        return self.request.session['dwolla_oauth_next']
 
 
 class WebhookView(CsrfExemptMixin, generic.View):
 
     def record_transaction(self, data):
+        # value = data["Value"]
+        source_id = data["Transaction"]["Source"]["Id"]
+        destination_id = data["Transaction"]["Destination"]["Id"]
+        kind = "dwolla.%s.%s" % (data["Type"], data["Subtype"])
         data_dict = {
-            "dtype": data["Type"],
-            "subtype": data["Subtype"],
-            "value": data["Value"],
-            "transaction": data["Transaction"],
-            "dwolla_id": data["Id"],
-            "source_id": data["Transaction"]["Source"]["Id"],
-            "destination_id": data["Transaction"]["Destination"]["Id"],
-            "amount": data["Transaction"]["Amount"]
+            "kind": kind,
+            "webhook_message": data["Transaction"],
+            "stripe_id": data["Id"],
         }
         try:
-            c = Customer.objects.get(dwolla_id=data_dict["source_id"])
+            c = Customer.objects.get(dwolla_id=source_id)
+            user = c.user
         except Customer.DoesNotExist:
-            c = Customer.objects.get(dwolla_id=data_dict["destination_id"])
+            c = Customer.objects.get(dwolla_id=destination_id)
+            user = c.user
         except Customer.DoesNotExist:
-            c = None
-        data_dict["customer"] = c
-        t, created = TransactionStatus.objects.get_or_create(
-            dwolla_id=data_dict['dwolla_id'],
-            defaults=data_dict
-        )
-        if not created:
-            t.value = data_dict['value']
-            t.save(update_fields=['value'])
+            c = user = None
+        data_dict.update({"dwolla_customer": c, "user": user})
+
+        if Event.objects.filter(stripe_id=data['Id']).exists():
+            EventProcessingException.objects.create(
+                data=data,
+                message="Duplicate event record",
+                traceback=""
+            )
+        else:
+            event = Event.objects.create(**data_dict)
+            # See djstripe Event model for next couple methods
+            # event.validate()
+            # event.process()
+
+        # t, created = TransactionStatus.objects.get_or_create(
+        #     dwolla_id=data_dict['dwolla_id'],
+        #     defaults=data_dict
+        # )
+        # if not created:
+        #     t.value = data_dict['value']
+        #     t.save(update_fields=['value'])
 
     def post(self, request, *args, **kwargs):
         if PY3:

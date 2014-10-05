@@ -17,7 +17,7 @@ urlpatterns = patterns("",
     url(
         r"^oauth/$",
         views.OAuthConfirmationView.as_view(),
-        name="ouath_conf"
+        name="oauth_conf"
     ),
     url(
         r"^pin_confirmed/$",
