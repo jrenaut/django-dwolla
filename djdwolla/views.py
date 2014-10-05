@@ -48,8 +48,8 @@ class OAuthView(LoginRequiredMixin, generic.TemplateView):
         data = super(OAuthView, self).get_context_data(**kwargs)
         redirect_uri = DWOLLA_ACCOUNT['oauth_uri']
         self.request.session['dwolla_oauth_next'] = self.request.GET['next']
-        print self.request.session.items()
-        scope = "send|balance|funding|transactions|accountinfofull"
+        # scope = "send|balance|funding|transactions|accountinfofull"
+        scope = "send"
         auth_url = DWOLLA_APP.init_oauth_url(redirect_uri, scope)
         data['auth_url'] = auth_url
         data['site_name'] = Site.objects.get().name
