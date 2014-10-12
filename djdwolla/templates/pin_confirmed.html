@@ -1,1 +1,19 @@
-PIN Confirmed
+{% load static from staticfiles %}
+
+<html>
+  <head>
+
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <link href="{% static 'bs/dist/css/bootstrap.css' %}" rel="stylesheet" media="screen" />
+    <link href="{% static 'font-awesome/css/font-awesome.min.css' %}" rel="stylesheet" media="screen" />
+    <link href="{% static 'css/style.css' %}" rel="stylesheet" media="screen" />
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js"></script>
+    <script src="{% static 'bs/dist/js/bootstrap.min.js' %}"></script>
+    <script type="text/javascript">
+      window.parent.completeDwollaAuth();
+   </script>
+  </head>
+<body>
+<h1>PIN Confirmed</h1>

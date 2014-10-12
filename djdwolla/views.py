@@ -30,9 +30,13 @@ class MyTemplateView(TemplateView):
         return data
 
 
-class PinConfirmedView(MyTemplateView):
+# class PinConfirmedView(MyTemplateView):
 
-    message = "PIN Confirmed"
+#     message = "PIN Confirmed"
+
+class PinConfirmedView(LoginRequiredMixin, generic.TemplateView):
+
+    template_name = "pin_confirmed.html"
 
 
 class OAuthRedirectView(MyTemplateView):
@@ -49,7 +53,7 @@ class OAuthView(LoginRequiredMixin, generic.TemplateView):
         redirect_uri = DWOLLA_ACCOUNT['oauth_uri']
         self.request.session['dwolla_oauth_next'] = self.request.GET['next']
         # scope = "send|balance|funding|transactions|accountinfofull"
-        scope = "send"
+        scope = "send|accountinfofull"
         auth_url = DWOLLA_APP.init_oauth_url(redirect_uri, scope)
         data['auth_url'] = auth_url
         data['site_name'] = Site.objects.get().name
@@ -61,7 +65,7 @@ class OAuthConfirmationView(LoginRequiredMixin, generic.UpdateView):
     model = Customer
     template_name = "pin_form.html"
     form_class = PinForm
-    # success_url = "/dwolla/pin_confirmed/"
+    success_url = "/dwolla/pin_confirmed/"
 
     def get_object(self):
         if hasattr(self.request.user, "dwolla_customer"):
@@ -90,8 +94,8 @@ class OAuthConfirmationView(LoginRequiredMixin, generic.UpdateView):
         else:
             return super(OAuthConfirmationView, self).get_initial()
 
-    def get_success_url(self):
-        return self.request.session['dwolla_oauth_next']
+    # def get_success_url(self):
+    #     return self.request.session['dwolla_oauth_next']
 
 
 class WebhookView(CsrfExemptMixin, generic.View):

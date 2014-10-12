@@ -1,18 +1,27 @@
-<div id="dwolla_modal" class="modal fade">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
-        <h4 class="modal-title">Authorize {{ site_name }} to access your Dwolla account</h4>
-      </div>
-      <div class="modal-body">
-	{{ site_name }} does not have authorization to access your Dwolla account.  You either need to sign up for a Dwolla account, or give authorization.  In either case, you will be redirected to dwolla.com.  Upon return to {{ site_name }}, you will be asked to enter your Dwolla PIN.  This will authorize {{ site_name }} to send money from your Dwolla account to {{ site_name }} on a monthly subscription basis.  Your PIN will be stored at {{ site_name }} in an encrypted state.
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
-        <a href="https://www.dwolla.com/Register" type="button" class="btn btn-info">Sign up</a>
-        <a id="dwolla_auth" href="{{ auth_url }}" type="button" class="btn btn-primary">Authorize</a>
-      </div>
-    </div><!-- /.modal-content -->
-  </div><!-- /.modal-dialog -->
-</div><!-- /.modal -->
+{% load static from staticfiles %}
+
+<!doctype html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <link href="{% static 'bs/dist/css/bootstrap.css' %}" rel="stylesheet" media="screen" />
+    <link href="{% static 'font-awesome/css/font-awesome.min.css' %}" rel="stylesheet" media="screen" />
+    <link href="{% static 'css/style.css' %}" rel="stylesheet" media="screen" />
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js"></script>
+    <script src="{% static 'bs/dist/js/bootstrap.min.js' %}"></script>
+  </head>
+  <body>
+    {{ site_name }} does not have authorization to access your Dwolla account.  You either need to sign up for a Dwolla account, or give authorization.  In either case, you will be redirected to dwolla.com.  Upon return to {{ site_name }}, you will be asked to enter your Dwolla PIN.  This will authorize {{ site_name }} to send money from your Dwolla account to {{ site_name }} on a monthly subscription basis.  Your PIN will be stored at {{ site_name }} in an encrypted state.
+    <br />
+    <div class="pull-right">
+      <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+      <a href="https://www.dwolla.com/Register" type="button" class="btn btn-info">Sign up</a>
+      <a id="dwolla_auth" href="{{ auth_url }}" type="button" class="btn btn-primary">Authorize</a>
+    </div>
+    <br />
+    <br />
+</div>
+</body>
+</html>
