@@ -138,7 +138,7 @@ class Customer(DwollaObject):
         self.refresh_token = resp['refresh_token']
         self.token = resp['access_token']
         self.save(update_fields=['token', 'refresh_token'])
-        return True
+        return self.token
 
     # def send_funds(self, amount, notes, pin=None, funds_source=None):
     #     pin = pin or self.pin
