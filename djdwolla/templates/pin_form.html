@@ -14,7 +14,7 @@
     <script src="{% static 'bs/dist/js/bootstrap.min.js' %}"></script>
     <script src="{% static 'js/custom.js' %}"></script>
   </head>
-<body>
+<body style="padding:0px 50px">
 
 <h1>Enter your Dwolla PIN</h1>
 <form action="{% url 'djdwolla:oauth_conf' %}" method="post">
@@ -23,13 +23,19 @@
       <label style="display:inline-block" class="control-label" for="id_pin_auth">{{ form.pin_auth }} By checking this box, I acknowledge that Devote.IO now has permission to transfer funds for my subscriptions on an ongoing monthly basis.  My PIN will be stored at Devote.IO (encrypted) along with the Dwolla OAuth token that I just authorized.</label>
   </div>
   <div class="row">
+    <div class="col-md-4">
+      <div class="input-group">
+	<span class="input-group-addon">Source</span>
+	{{ form.funds_source }}
+      </div>
+    </div>
     <div class="col-md-2">
       <div class="input-group">
 	<span class="input-group-addon">PIN</span>
 	{{ form.pin }}
       </div>
       <br />
-      {{ form.errors }}
+      {{ form.pin.errors }}
       {% for f in form.hidden_fields %}
       {{ f }}
       {% endfor %}

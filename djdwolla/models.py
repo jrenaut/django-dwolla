@@ -111,6 +111,7 @@ class Customer(DwollaObject):
     token = models.CharField(max_length=100, null=True, blank=True)
     refresh_token = models.CharField(max_length=100, null=True, blank=True)
     pin = EncryptedCharField(max_length=100, null=True, blank=True)
+    funds_source = models.CharField(max_length=50, blank=True, null=True)
     card_fingerprint = models.CharField(max_length=200, blank=True)
     card_last_4 = models.CharField(max_length=4, blank=True)
     card_kind = models.CharField(max_length=50, blank=True)
@@ -213,9 +214,11 @@ class CurrentSubscription(TimeStampedModel):
     def charge_subscription(self):
         self.customer.update_tokens()
         cus = self.customer
+        metadata = {'recur': 'recur'}
         send_funds.delay(cus.token, DWOLLA_ACCOUNT['user_id'],
                          float(self.amount), cus.pin,
-                         "Devote.IO monthly subscription")
+                         "Devote.io monthly subscription",
+                         metadata=metadata)
 
     @classmethod
     def get_or_create(cls, customer, amount=0):

@@ -2,13 +2,14 @@
 from __future__ import unicode_literals
 
 import json
+import logging
 from django.views.generic.base import TemplateView
 from django.views import generic
 from django.http import HttpResponse
 from django.contrib.sites.models import Site
 from braces.views import CsrfExemptMixin
 from dwolla import DwollaUser
-from .auth import DWOLLA_APP, DWOLLA_ACCOUNT
+from .auth import DWOLLA_APP, DWOLLA_ACCOUNT, DWOLLA_GATE
 
 from .mixins import LoginRequiredMixin
 from .forms import PinForm
@@ -17,6 +18,10 @@ from .settings import PY3
 from djstripe.models import Event, EventProcessingException
 import urllib
 from django.contrib import messages
+from delorean import Delorean
+
+
+logger = logging.getLogger("devote.debug")
 
 
 class MyTemplateView(TemplateView):
@@ -29,10 +34,6 @@ class MyTemplateView(TemplateView):
         data['message'] = self.message
         return data
 
-
-# class PinConfirmedView(MyTemplateView):
-
-#     message = "PIN Confirmed"
 
 class PinConfirmedView(LoginRequiredMixin, generic.TemplateView):
 
@@ -53,7 +54,7 @@ class OAuthView(LoginRequiredMixin, generic.TemplateView):
         redirect_uri = DWOLLA_ACCOUNT['oauth_uri']
         self.request.session['dwolla_oauth_next'] = self.request.GET['next']
         # scope = "send|balance|funding|transactions|accountinfofull"
-        scope = "send|accountinfofull"
+        scope = "send|accountinfofull|funding"
         auth_url = DWOLLA_APP.init_oauth_url(redirect_uri, scope)
         data['auth_url'] = auth_url
         data['site_name'] = Site.objects.get().name
@@ -82,7 +83,14 @@ class OAuthConfirmationView(LoginRequiredMixin, generic.UpdateView):
     def form_valid(self, form):
         messages.info(self.request,
                       "Your pin is confirmed, and your Dwolla account is now authorized.")
+        del self.request.session['dwolla_funds_source_choices']
         return super(OAuthConfirmationView, self).form_valid(form)
+
+    def get_form_kwargs(self):
+        kwargs = super(OAuthConfirmationView, self).get_form_kwargs()
+        choices = self.request.session['dwolla_funds_source_choices']
+        kwargs.update({'choices': choices})
+        return kwargs
 
     def get_initial(self):
         if self.request.method == "GET":
@@ -90,6 +98,10 @@ class OAuthConfirmationView(LoginRequiredMixin, generic.UpdateView):
             access_token = tokens['access_token']
             refresh_token = tokens['refresh_token']
             dwolla_id = DwollaUser(access_token).get_account_info()['Id']
+            funding_sources = DwollaUser(access_token).get_funding_sources()
+            choices = [(source['Id'], source['Name']) for source in funding_sources]
+            choices.extend([('', 'Dwolla Account Balance')])
+            self.request.session['dwolla_funds_source_choices'] = choices
             return {"pin": "", "token": access_token, "refresh_token": refresh_token, "dwolla_id": dwolla_id}
         else:
             return super(OAuthConfirmationView, self).get_initial()
@@ -101,68 +113,51 @@ class OAuthConfirmationView(LoginRequiredMixin, generic.UpdateView):
 class WebhookView(CsrfExemptMixin, generic.View):
 
     def record_transaction(self, data):
-        # value = data["Value"]
-        source_id = data["Transaction"]["Source"]["Id"]
-        destination_id = data["Transaction"]["Destination"]["Id"]
-        kind = "dwolla.%s.%s" % (data["Type"], data["Subtype"])
+        subtype = data["Subtype"]
+        kind = "dwolla.%s.%s" % (data["Type"], subtype)
         data_dict = {
             "kind": kind,
-            "webhook_message": data["Transaction"],
-            "stripe_id": data["Id"],
+            "webhook_message": data,
         }
+        if subtype == "Status":
+            stripe_id = data["Id"]
+        elif subtype == "Returned":
+            stripe_id = "%s_returned" % data["SenderTransactionId"]
+        else:
+            stripe_id = "dwolla_%f" % Delorean().epoch()
+            logger.info("Dwolla webhook subtype unrecognized, check event with stripe_id '%s'" % stripe_id)
+        data_dict['stripe_id'] = stripe_id
         try:
-            c = Customer.objects.get(dwolla_id=source_id)
+            c = Customer.objects.get(pk=data['Metadata']['customer'])
             user = c.user
-        except Customer.DoesNotExist:
-            c = Customer.objects.get(dwolla_id=destination_id)
-            user = c.user
-        except Customer.DoesNotExist:
+        except KeyError:
             c = user = None
         data_dict.update({"dwolla_customer": c, "user": user})
 
-        if Event.objects.filter(stripe_id=data['Id']).exists():
+        if Event.objects.filter(stripe_id=stripe_id).exists():
             EventProcessingException.objects.create(
                 data=data,
                 message="Duplicate event record",
                 traceback=""
             )
         else:
-            event = Event.objects.create(**data_dict)
+            Event.objects.create(**data_dict)
             # See djstripe Event model for next couple methods
             # event.validate()
             # event.process()
 
-        # t, created = TransactionStatus.objects.get_or_create(
-        #     dwolla_id=data_dict['dwolla_id'],
-        #     defaults=data_dict
-        # )
-        # if not created:
-        #     t.value = data_dict['value']
-        #     t.save(update_fields=['value'])
-
     def post(self, request, *args, **kwargs):
+        signature = request.META['HTTP_X_DWOLLA_SIGNATURE']
         if PY3:
             # Handles Python 3 conversion of bytes to str
             body = request.body.decode(encoding="UTF-8")
         else:
             # Handles Python 2
             body = request.body
-        data = json.loads(body)
-        if data['Type'] == "Transaction":
-            self.record_transaction(data)
-        # if RequestFulfilled.objects.filter(dwolla_id=data["Id"]).exists():
-        #     EventProcessingException.objects.create(
-        #         data=data,
-        #         message="Duplicate event record",
-        #         traceback=""
-        #     )
-        # else:
-        #     RequestFulfilled.objects.create(
-        #         dwolla_id=data["Id"],
-        #         source_id=data["Source"],
-        #         destination_id=data["Destination"],
-        #         transaction=data["Transaction"],
-        #         amount=data['Amount']
-        #     )
+        if DWOLLA_GATE.verify_webhook_signature(signature, body):
+            data = json.loads(body)
+            if data['Type'] == "Transaction":
+                self.record_transaction(data)
+        else:
+            logger.warning("Dwolla signature mismatch")
         return HttpResponse()
-

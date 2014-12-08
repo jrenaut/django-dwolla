@@ -12,4 +12,4 @@ DWOLLA_ACCOUNT = settings.DWOLLA_ACCOUNTS[KEY]
 
 DWOLLA_APP = DwollaClientApp(DWOLLA_ACCOUNT['key'], DWOLLA_ACCOUNT['secret'])
 DWOLLA_USER = DwollaUser(DWOLLA_ACCOUNT['token'])
-DWOLLA_GATE = DwollaGateway(DWOLLA_ACCOUNT['key'], DWOLLA_ACCOUNT['secret'], 'http://google.com')
+DWOLLA_GATE = DwollaGateway(DWOLLA_ACCOUNT['key'], DWOLLA_ACCOUNT['secret'])

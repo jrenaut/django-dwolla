@@ -5,10 +5,12 @@ from dwolla import DwollaUser
 
 
 @shared_task
-def send_funds(token, dwolla_account, amount, pin, notes=None, funds_source=None):
+def send_funds(token, dwolla_account, amount, pin, notes=None, funds_source=None, metadata={}):
     dwolla_user = DwollaUser(token)
-    dwolla_user.send_funds(amount, dwolla_account, pin, notes=notes, funds_source=funds_source)
-    return True
+    tid = dwolla_user.send_funds(amount, dwolla_account, pin,
+                                 notes=notes, funds_source=funds_source,
+                                 metadata=metadata)
+    return tid
 
 
 @shared_task(name="foo")
