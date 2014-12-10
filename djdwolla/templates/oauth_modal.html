@@ -16,6 +16,9 @@
 	  $("button[data-dismiss='modal']").click(function(){
             window.parent.hideModal();
 	  });
+  	  $(".start-spin").click(function(){
+	    $("#dwolla_oauth_spinner").toggle();
+	  });
         });
    </script>
   </head>
@@ -24,11 +27,14 @@
     <br />
     <div class="pull-right">
       <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
-      <a href="https://www.dwolla.com/Register" type="button" class="btn btn-info">Sign up</a>
-      <a id="dwolla_auth" href="{{ auth_url }}" type="button" class="btn btn-primary">Authorize</a>
+      <a href="https://www.dwolla.com/Register" type="button" class="start-spin btn btn-info">Sign up</a>
+      <a id="dwolla_auth" href="{{ auth_url }}" type="button" class="start-spin btn btn-primary">Authorize</a>
     </div>
     <br />
     <br />
+    <div style="text-align:center;display:none" id="dwolla_oauth_spinner">
+      <i class="fa fa-spinner fa-5x fa-spin"></i>
+    </div>
 </div>
 </body>
 </html>
