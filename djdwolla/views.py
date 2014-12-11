@@ -125,7 +125,8 @@ class WebhookView(CsrfExemptMixin, generic.View):
             stripe_id = "%s_returned" % data["SenderTransactionId"]
         else:
             stripe_id = "dwolla_%f" % Delorean().epoch()
-            logger.info("Dwolla webhook subtype unrecognized, check event with stripe_id '%s'" % stripe_id)
+            logger.info("Dwolla webhook subtype unrecognized, check event \
+            with stripe_id '%s'" % stripe_id)
         data_dict['stripe_id'] = stripe_id
         try:
             c = Customer.objects.get(pk=data['Metadata']['customer'])
@@ -134,8 +135,10 @@ class WebhookView(CsrfExemptMixin, generic.View):
             c = user = None
         data_dict.update({"dwolla_customer": c, "user": user})
 
-        if Event.objects.filter(stripe_id=stripe_id).exists():
+        existing_events = Event.objects.filter(stripe_id=stripe_id)
+        if existing_events:
             EventProcessingException.objects.create(
+                event=existing_events[0],
                 data=data,
                 message="Duplicate event record",
                 traceback=""
