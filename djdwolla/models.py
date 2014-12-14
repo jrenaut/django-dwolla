@@ -116,6 +116,7 @@ class Customer(DwollaObject):
     card_last_4 = models.CharField(max_length=4, blank=True)
     card_kind = models.CharField(max_length=50, blank=True)
     date_purged = models.DateTimeField(null=True, editable=False)
+    token_expiration = models.DateTimeField(null=True)
 
     objects = CustomerManager()
 
@@ -133,6 +134,11 @@ class Customer(DwollaObject):
     def create(cls, user):
         cus = Customer.objects.create(user=user)
         return cus
+
+    def get_token(self):
+        if self.token_expiration <= Delorean().datetime:
+            token = self.update_tokens()
+        return token
 
     def update_tokens(self):
         resp = DWOLLA_APP.refresh_auth(self.refresh_token)
@@ -212,10 +218,10 @@ class CurrentSubscription(TimeStampedModel):
         return Plan.objects.get(name=str(self.customer.user))
 
     def charge_subscription(self):
-        self.customer.update_tokens()
+        token = self.customer.get_token()
         cus = self.customer
         metadata = {'recur': 'recur'}
-        send_funds.delay(cus.token, DWOLLA_ACCOUNT['user_id'],
+        send_funds.delay(token, DWOLLA_ACCOUNT['user_id'],
                          float(self.amount), cus.pin,
                          "Devote.io monthly subscription",
                          metadata=metadata)
@@ -276,6 +282,7 @@ class Plan(DwollaObject):
 
     def __str__(self):
         return self.name
+
 
     # @classmethod
     # def create(cls, metadata={}, **kwargs):

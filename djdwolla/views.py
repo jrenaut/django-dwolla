@@ -58,6 +58,7 @@ class OAuthView(LoginRequiredMixin, generic.TemplateView):
         auth_url = DWOLLA_APP.init_oauth_url(redirect_uri, scope)
         data['auth_url'] = auth_url
         data['site_name'] = Site.objects.get().name
+        data['terms'] = self.request.GET.get("terms")
         return data
 
 

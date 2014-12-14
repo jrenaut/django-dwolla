@@ -11,8 +11,3 @@ def send_funds(token, dwolla_account, amount, pin, notes=None, funds_source=None
                                  notes=notes, funds_source=funds_source,
                                  metadata=metadata)
     return tid
-
-
-@shared_task(name="foo")
-def add(x, y):
-    return x + y

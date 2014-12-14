@@ -23,8 +23,12 @@
    </script>
   </head>
   <body style="padding:30px">
-    {{ site_name }} does not have authorization to access your Dwolla account.  You either need to sign up for a Dwolla account, or give authorization.  In either case, you will be redirected to dwolla.com.  Upon return to {{ site_name }}, you will be asked to enter your Dwolla PIN.  This will authorize {{ site_name }} to send money from your Dwolla account to {{ site_name }} on a monthly subscription basis.  Your PIN will be stored at {{ site_name }} in an encrypted state.
-    <br />
+    <p>{{ site_name }} does not have authorization to access your Dwolla account.  You either need to sign up for a Dwolla account, or give authorization.  In either case, you will be redirected to dwolla.com.  Upon return to {{ site_name }}, you will be asked to enter your Dwolla PIN.  This will authorize {{ site_name }} to send money from your Dwolla account to {{ site_name }} on a monthly subscription basis, or for every one-time tip you choose to give to your Devoted.  Your PIN will be stored at {{ site_name }} in an encrypted state.</p>
+
+    {% if terms %}
+    <p>Upon confirming your pin, your payment terms will be: <strong>{{ terms }}</strong></p>
+    {% endif %}
+
     <div class="pull-right">
       <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
       <a href="https://www.dwolla.com/Register" type="button" class="start-spin btn btn-info">Sign up</a>
