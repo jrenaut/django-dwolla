@@ -119,6 +119,7 @@ class WebhookView(CsrfExemptMixin, generic.View):
         data_dict = {
             "kind": kind,
             "webhook_message": data,
+            "valid": True
         }
         if subtype == "Status":
             stripe_id = data["Id"]
