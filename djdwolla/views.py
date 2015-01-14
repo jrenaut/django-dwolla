@@ -90,7 +90,7 @@ class OAuthConfirmationView(LoginRequiredMixin, generic.UpdateView):
     def get_form_kwargs(self):
         kwargs = super(OAuthConfirmationView, self).get_form_kwargs()
         choices = self.request.session['dwolla_funds_source_choices']
-        kwargs.update({'choices': choices})
+        kwargs.update({'choices': choices, 'request': self.request})
         return kwargs
 
     def get_initial(self):

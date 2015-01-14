@@ -1,4 +1,5 @@
 from django import forms
+from django.contrib import messages
 from .models import Customer
 
 from .auth import DWOLLA_ACCOUNT
@@ -21,9 +22,11 @@ class PinForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
-        choices = kwargs.pop("choices", ())
+        self.funds_choices = kwargs.pop("choices", ())
+        self.request = kwargs.pop("request")
         super(PinForm, self).__init__(*args, **kwargs)
-        self.fields['funds_source'].widget = forms.Select(choices=choices, attrs={"class": "form-control"})
+        self.fields['funds_source'].widget = forms.Select(choices=self.funds_choices,
+                                                          attrs={"class": "form-control"})
 
     def clean_pin_auth(self):
         data = self.cleaned_data['pin_auth']
@@ -32,17 +35,23 @@ class PinForm(forms.ModelForm):
         return data
 
     def clean(self):
+        warning_message = ('You have chosen your Dwolla balance for you funding '
+                           'source and the balance is less than $1.00.  Be sure '
+                           'to fund the account balance immediately so we can '
+                           'process payment for your subscriptions on the first '
+                           'of next month.')
         cleaned_data = super(PinForm, self).clean()
         data = cleaned_data['pin']
         token = cleaned_data['token']
+        funds_source = cleaned_data['funds_source']
         if not data.isdigit():
             self.add_error('pin', "The PIN must only contain numbers")
         else:
-            funds_source = "Devote.IO bogus funds source request to verify user pin"
+            bogus_funds_source = "Devote.IO bogus funds source request to verify user pin"
             notes = "Verifying PIN via invalid funds source"
             try:
                 send_funds(token, DWOLLA_ACCOUNT['user_id'],
-                           0.01, data, notes, funds_source=funds_source)
+                           0.01, data, notes, funds_source=bogus_funds_source)
             except DwollaAPIError as e:
                 """ If error is invalid funding, then the PIN verified
                 This is a hack because Dwolla doesn't have
@@ -51,6 +60,8 @@ class PinForm(forms.ModelForm):
                 if e.message == 'Invalid account PIN':
                     self.add_error('pin', e.message)
                 elif "Invalid funding source provided" in e.message:
-                    pass
+                    if funds_source == "Balance" and \
+                       DwollaUser(token).get_funding_source("Balance")["Balance"] < 1:
+                        messages.warning(self.request, warning_message, extra_tags='sticky')
                 else:
                     raise
