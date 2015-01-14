@@ -101,7 +101,7 @@ class OAuthConfirmationView(LoginRequiredMixin, generic.UpdateView):
             dwolla_id = DwollaUser(access_token).get_account_info()['Id']
             funding_sources = DwollaUser(access_token).get_funding_sources()
             choices = [(source['Id'], source['Name']) for source in funding_sources]
-            choices.extend([('', 'Dwolla Account Balance')])
+            # choices.extend([('', 'Dwolla Account Balance')])
             self.request.session['dwolla_funds_source_choices'] = choices
             return {"pin": "", "token": access_token, "refresh_token": refresh_token, "dwolla_id": dwolla_id}
         else:
