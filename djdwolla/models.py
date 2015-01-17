@@ -3,7 +3,7 @@ from __future__ import unicode_literals
 
 import traceback
 
-from .auth import DWOLLA_ACCOUNT, DWOLLA_APP, DWOLLA_GATE
+from .auth import DWOLLA_ACCOUNT, DWOLLA_APP, DWOLLA_GATE, DWOLLA_ADMIN_APP
 from .managers import CustomerManager
 from .tasks import send_funds
 from model_utils.models import TimeStampedModel
@@ -140,8 +140,11 @@ class Customer(DwollaObject):
             token = self.update_tokens()
         return token
 
-    def update_tokens(self):
-        resp = DWOLLA_APP.refresh_auth(self.refresh_token)
+    def update_tokens(self, admin=False):
+        if admin is False:
+            resp = DWOLLA_APP.refresh_auth(self.refresh_token)
+        else:
+            resp = DWOLLA_ADMIN_APP.refresh_auth(self.refresh_token)
         self.refresh_token = resp['refresh_token']
         self.token = resp['access_token']
         self.save(update_fields=['token', 'refresh_token'])
