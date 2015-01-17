@@ -20,6 +20,7 @@ else:
                                        DWOLLA_ADMIN_ACCOUNT['secret'])
     
 DWOLLA_ACCOUNT = settings.DWOLLA_ACCOUNTS[KEY]
-
 DWOLLA_APP = DwollaClientApp(DWOLLA_ACCOUNT['key'], DWOLLA_ACCOUNT['secret'])
+if DWOLLA_ADMIN_APP is None:
+    DWOLLA_ADMIN_APP = DWOLLA_APP
 DWOLLA_GATE = DwollaGateway(DWOLLA_ACCOUNT['key'], DWOLLA_ACCOUNT['secret'])
