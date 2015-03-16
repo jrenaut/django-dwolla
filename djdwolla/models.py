@@ -3,9 +3,9 @@ from __future__ import unicode_literals
 
 import traceback
 
-from .auth import DWOLLA_ACCOUNT, DWOLLA_APP, DWOLLA_GATE, DWOLLA_ADMIN_APP
+from .auth import constants
 from .managers import CustomerManager
-from .tasks import send_funds
+# from .tasks import send_funds
 from model_utils.models import TimeStampedModel
 from delorean import Delorean
 from jsonfield.fields import JSONField
@@ -17,26 +17,26 @@ from django.db import models
 from django_extensions.db.fields.encrypted import EncryptedCharField
 
 
-def dwolla_charge(sub):
-    # Clear out any previous session
-    DWOLLA_GATE.start_gateway_session()
+# def dwolla_charge(sub):
+#     # Clear out any previous session
+#     DWOLLA_GATE.start_gateway_session()
 
-    # Add a product to the purchase order
-    # DWOLLA_GATE.add_gateway_product(str(sub.customer), float(sub.amount))
-    DWOLLA_GATE.add_gateway_product('Devote.io subscription', 21.00)
+#     # Add a product to the purchase order
+#     # DWOLLA_GATE.add_gateway_product(str(sub.customer), float(sub.amount))
+#     DWOLLA_GATE.add_gateway_product('Devote.io subscription', 21.00)
 
-    # Generate a checkout URL; pass in the recipient's Dwolla ID
-    # url = DWOLLA_GATE.get_gateway_URL(str(sub.customer))
-    url = DWOLLA_GATE.get_gateway_URL(DWOLLA_ACCOUNT['user_id'])
-    return url
+#     # Generate a checkout URL; pass in the recipient's Dwolla ID
+#     # url = DWOLLA_GATE.get_gateway_URL(str(sub.customer))
+#     url = DWOLLA_GATE.get_gateway_URL(DWOLLA_ACCOUNT['user_id'])
+#     return url
 
 
-def create_oauth_request_url():
-    """ Send users to this url to authorize us """
-    redirect_uri = "https://www.back2ursite.com/return"
-    scope = "send|balance|funding|transactions|accountinfofull"
-    authUrl = DWOLLA_APP.init_oauth_url(redirect_uri, scope)
-    return authUrl
+# def create_oauth_request_url():
+#     """ Send users to this url to authorize us """
+#     redirect_uri = "https://www.back2ursite.com/return"
+#     scope = "send|balance|funding|transactions|accountinfofull"
+#     authUrl = DWOLLA_APP.init_oauth_url(redirect_uri, scope)
+#     return authUrl
 
 
 class DwollaObject(TimeStampedModel):
@@ -140,11 +140,9 @@ class Customer(DwollaObject):
             token = self.update_tokens()
         return token
 
-    def update_tokens(self, admin=False):
-        if admin is False:
-            resp = DWOLLA_APP.refresh_auth(self.refresh_token)
-        else:
-            resp = DWOLLA_ADMIN_APP.refresh_auth(self.refresh_token)
+    def update_tokens(self, constants=constants):
+        from dwolla import oauth
+        resp = oauth.refresh(self.refresh_token)
         self.refresh_token = resp['refresh_token']
         self.token = resp['access_token']
         self.save(update_fields=['token', 'refresh_token'])
@@ -213,21 +211,21 @@ class CurrentSubscription(TimeStampedModel):
 
         return True
 
-    def create_charge(self):
-        url = dwolla_charge(self)
-        return url
+    # def create_charge(self):
+    #     url = dwolla_charge(self)
+    #     return url
 
     def get_plan(self):
         return Plan.objects.get(name=str(self.customer.user))
 
-    def charge_subscription(self):
-        token = self.customer.get_token()
-        cus = self.customer
-        metadata = {'recur': 'recur'}
-        send_funds.delay(token, DWOLLA_ACCOUNT['user_id'],
-                         float(self.amount), cus.pin,
-                         "Devote.io monthly subscription",
-                         metadata=metadata)
+    # def charge_subscription(self):
+    #     token = self.customer.get_token()
+    #     cus = self.customer
+    #     metadata = {'recur': 'recur'}
+    #     send_funds.delay(token, DWOLLA_ACCOUNT['user_id'],
+    #                      float(self.amount), cus.pin,
+    #                      "Devote.io monthly subscription",
+    #                      metadata=metadata)
 
     @classmethod
     def get_or_create(cls, customer, amount=0):

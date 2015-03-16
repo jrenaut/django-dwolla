@@ -4,7 +4,7 @@ from .models import Customer
 
 from .auth import DWOLLA_ACCOUNT
 from .tasks import send_funds
-from dwolla import DwollaAPIError, DwollaUser
+from dwolla import constants, fundingsources
 
 
 class PinForm(forms.ModelForm):
@@ -52,7 +52,7 @@ class PinForm(forms.ModelForm):
             try:
                 send_funds(token, DWOLLA_ACCOUNT['user_id'],
                            0.01, data, notes, funds_source=bogus_funds_source)
-            except DwollaAPIError as e:
+            except Exception as e:
                 """ If error is invalid funding, then the PIN verified
                 This is a hack because Dwolla doesn't have
                 an API call to verify a PIN
@@ -61,7 +61,7 @@ class PinForm(forms.ModelForm):
                     self.add_error('pin', e.message)
                 elif "Invalid funding source provided" in e.message:
                     if funds_source == "Balance" and \
-                       DwollaUser(token).get_funding_source("Balance")["Balance"] < 1:
+                       fundingsources.get("Balance", alternate_token=token)["Balance"] < 1:
                         messages.warning(self.request, warning_message, extra_tags='sticky')
                 else:
                     raise

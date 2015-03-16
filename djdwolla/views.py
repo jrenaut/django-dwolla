@@ -8,8 +8,9 @@ from django.views import generic
 from django.http import HttpResponse
 from django.contrib.sites.models import Site
 from braces.views import CsrfExemptMixin
-from dwolla import DwollaUser
-from .auth import DWOLLA_APP, DWOLLA_ACCOUNT, DWOLLA_GATE
+from .auth import constants
+from dwolla import oauth, webhooks, fundingsources, accounts
+from .auth import DWOLLA_ACCOUNT
 
 from .mixins import LoginRequiredMixin
 from .forms import PinForm
@@ -55,7 +56,7 @@ class OAuthView(LoginRequiredMixin, generic.TemplateView):
         self.request.session['dwolla_oauth_next'] = self.request.GET['next']
         # scope = "send|balance|funding|transactions|accountinfofull"
         scope = "send|accountinfofull|funding"
-        auth_url = DWOLLA_APP.init_oauth_url(redirect_uri, scope)
+        auth_url = oauth.genauthurl(redirect=redirect_uri, scope=scope)
         data['auth_url'] = auth_url
         data['site_name'] = Site.objects.get().name
         data['terms'] = self.request.GET.get("terms")
@@ -78,7 +79,7 @@ class OAuthConfirmationView(LoginRequiredMixin, generic.UpdateView):
 
     def get_token(self):
         code = self.request.GET['code']
-        dwolla_resp = DWOLLA_APP.get_oauth_token(code)
+        dwolla_resp = oauth.get(code)
         return dwolla_resp
 
     def form_valid(self, form):
@@ -98,12 +99,13 @@ class OAuthConfirmationView(LoginRequiredMixin, generic.UpdateView):
             tokens = self.get_token()
             access_token = tokens['access_token']
             refresh_token = tokens['refresh_token']
-            dwolla_id = DwollaUser(access_token).get_account_info()['Id']
-            funding_sources = DwollaUser(access_token).get_funding_sources()
+            dwolla_id = accounts.full(alternate_token=access_token)['Id']
+            funding_sources = fundingsources(alternate_token=access_token)
             choices = [(source['Id'], source['Name']) for source in funding_sources]
             # choices.extend([('', 'Dwolla Account Balance')])
             self.request.session['dwolla_funds_source_choices'] = choices
-            return {"pin": "", "token": access_token, "refresh_token": refresh_token, "dwolla_id": dwolla_id}
+            return {"pin": "", "token": access_token,
+                    "refresh_token": refresh_token, "dwolla_id": dwolla_id}
         else:
             return super(OAuthConfirmationView, self).get_initial()
 
@@ -159,7 +161,7 @@ class WebhookView(CsrfExemptMixin, generic.View):
         else:
             # Handles Python 2
             body = request.body
-        if DWOLLA_GATE.verify_webhook_signature(signature, body):
+        if webhooks.verify(signature, body):
             data = json.loads(body)
             if data['Type'] == "Transaction":
                 self.record_transaction(data)
