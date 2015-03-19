@@ -61,7 +61,7 @@ class PinForm(forms.ModelForm):
                     self.add_error('pin', e.message)
                 elif "Invalid funding source provided" in e.message:
                     if funds_source == "Balance" and \
-                       fundingsources.get("Balance", alternate_token=token)["Balance"] < 1:
+                       fundingsources.info("Balance", alternate_token=token)["Balance"] < 1:
                         messages.warning(self.request, warning_message, extra_tags='sticky')
                 else:
                     raise
