@@ -8,7 +8,7 @@ from django.views import generic
 from django.http import HttpResponse
 from django.contrib.sites.models import Site
 from braces.views import CsrfExemptMixin
-from .auth import constants
+from .auth import user_constants, constants
 from dwolla import oauth, webhooks, fundingsources, accounts
 from .auth import DWOLLA_ACCOUNT
 
@@ -22,6 +22,7 @@ from django.contrib import messages
 from delorean import Delorean
 
 
+constants = user_constants(constants)
 logger = logging.getLogger("devote.debug")
 
 

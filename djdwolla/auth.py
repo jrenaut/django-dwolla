@@ -16,8 +16,6 @@ if settings.DWOLLA_SANDBOX:
     DWOLLA_ADMIN_APP = None
 else:
     KEY = 'production'
-    constants.client_id = settings.DWOLLA_ACCOUNTS[KEY]['key']
-    constants.client_secret = settings.DWOLLA_ACCOUNTS[KEY]['secret']
     # admin_constants = constants
     DWOLLA_ADMIN_ACCOUNT = settings.DWOLLA_ACCOUNTS['admin']
     DWOLLA_ADMIN_ID = DWOLLA_ADMIN_ACCOUNT['user_id']
@@ -32,6 +30,12 @@ DWOLLA_ACCOUNT = settings.DWOLLA_ACCOUNTS[KEY]
 # if DWOLLA_ADMIN_APP is None:
 #     DWOLLA_ADMIN_APP = DWOLLA_APP
 # DWOLLA_GATE = DwollaGateway(DWOLLA_ACCOUNT['key'], DWOLLA_ACCOUNT['secret'])
+
+
+def user_constants(constants):
+    constants.client_id = settings.DWOLLA_ACCOUNTS[KEY]['key']
+    constants.client_secret = settings.DWOLLA_ACCOUNTS[KEY]['secret']
+    return constants
 
 
 def admin_constants(constants):
