@@ -34,7 +34,7 @@ DWOLLA_ACCOUNT = settings.DWOLLA_ACCOUNTS[KEY]
 
 
 def set_constants(admin=False):
-    if admin is True:
+    if admin is False:
         constants.client_id = settings.DWOLLA_ACCOUNTS[KEY]['key']
         constants.client_secret = settings.DWOLLA_ACCOUNTS[KEY]['secret']
     else:
