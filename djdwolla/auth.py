@@ -9,9 +9,8 @@ from dwolla import constants
 
 if settings.DWOLLA_SANDBOX:
     KEY = 'sandbox'
-    constants.client_id = settings.DWOLLA_ACCOUNTS[KEY]['key']
-    constants.client_secret = settings.DWOLLA_ACCOUNTS[KEY]['secret']
     # admin_constants = constants
+    DWOLLA_ADMIN_ACCOUNT = settings.DWOLLA_ACCOUNTS[KEY]
     DWOLLA_ADMIN_ID = settings.DWOLLA_ACCOUNTS['sandbox']['user_id']
     DWOLLA_ADMIN_APP = None
 else:
@@ -22,6 +21,8 @@ else:
     # admin_constants.client_id = DWOLLA_ADMIN_ACCOUNT['key']
     # admin_constants.client_secret = DWOLLA_ADMIN_ACCOUNT['secret']
 
+constants.client_id = settings.DWOLLA_ACCOUNTS[KEY]['key']
+constants.client_secret = settings.DWOLLA_ACCOUNTS[KEY]['secret']
 constants.sandbox = settings.DWOLLA_SANDBOX
 
     
@@ -32,10 +33,13 @@ DWOLLA_ACCOUNT = settings.DWOLLA_ACCOUNTS[KEY]
 # DWOLLA_GATE = DwollaGateway(DWOLLA_ACCOUNT['key'], DWOLLA_ACCOUNT['secret'])
 
 
-def user_constants(constants):
-    constants.client_id = settings.DWOLLA_ACCOUNTS[KEY]['key']
-    constants.client_secret = settings.DWOLLA_ACCOUNTS[KEY]['secret']
-    return constants
+def set_constants(admin=False):
+    if admin is True:
+        constants.client_id = settings.DWOLLA_ACCOUNTS[KEY]['key']
+        constants.client_secret = settings.DWOLLA_ACCOUNTS[KEY]['secret']
+    else:
+        constants.client_id = DWOLLA_ADMIN_ACCOUNT['key']
+        constants.client_secret = DWOLLA_ADMIN_ACCOUNT['secret']
 
 
 def admin_constants(constants):
