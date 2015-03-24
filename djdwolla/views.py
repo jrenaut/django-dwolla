@@ -9,7 +9,6 @@ from django.http import HttpResponse
 from django.contrib.sites.models import Site
 from braces.views import CsrfExemptMixin
 from .auth import set_constants
-from dwolla import oauth, webhooks, fundingsources, accounts
 from .auth import DWOLLA_ACCOUNT
 
 from .mixins import LoginRequiredMixin
@@ -56,7 +55,8 @@ class OAuthView(LoginRequiredMixin, generic.TemplateView):
         self.request.session['dwolla_oauth_next'] = self.request.GET['next']
         # scope = "send|balance|funding|transactions|accountinfofull"
         scope = "send|accountinfofull|funding"
-        set_constants()
+        constants = set_constants()
+        from dwolla import oauth
         auth_url = oauth.genauthurl(redirect=redirect_uri, scope=scope)
         data['auth_url'] = auth_url
         data['site_name'] = Site.objects.get().name
@@ -80,6 +80,8 @@ class OAuthConfirmationView(LoginRequiredMixin, generic.UpdateView):
 
     def get_token(self):
         code = self.request.GET['code']
+        constants = set_constants()
+        from dwolla import oauth
         dwolla_resp = oauth.get(code)
         return dwolla_resp
 
@@ -100,6 +102,8 @@ class OAuthConfirmationView(LoginRequiredMixin, generic.UpdateView):
             tokens = self.get_token()
             access_token = tokens['access_token']
             refresh_token = tokens['refresh_token']
+            constants = set_constants()
+            from dwolla import accounts, fundingsources
             dwolla_id = accounts.full(alternate_token=access_token)['Id']
             funding_sources = fundingsources.get(alternate_token=access_token)
             choices = [(source['Id'], source['Name']) for source in funding_sources]
@@ -155,6 +159,8 @@ class WebhookView(CsrfExemptMixin, generic.View):
             # event.process()
 
     def post(self, request, *args, **kwargs):
+        constants = set_constants()
+        from dwolla import webhooks
         signature = request.META['HTTP_X_DWOLLA_SIGNATURE']
         if PY3:
             # Handles Python 3 conversion of bytes to str
@@ -162,6 +168,7 @@ class WebhookView(CsrfExemptMixin, generic.View):
         else:
             # Handles Python 2
             body = request.body
+
         if webhooks.verify(signature, body):
             data = json.loads(body)
             if data['Type'] == "Transaction":

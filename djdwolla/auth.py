@@ -40,6 +40,7 @@ def set_constants(admin=False):
     else:
         constants.client_id = DWOLLA_ADMIN_ACCOUNT['key']
         constants.client_secret = DWOLLA_ADMIN_ACCOUNT['secret']
+    return constants
 
 
 def admin_constants(constants):
