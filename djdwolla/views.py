@@ -23,7 +23,6 @@ from delorean import Delorean
 
 
 logger = logging.getLogger("devote.debug")
-set_constants()
 
 
 class MyTemplateView(TemplateView):
@@ -57,6 +56,7 @@ class OAuthView(LoginRequiredMixin, generic.TemplateView):
         self.request.session['dwolla_oauth_next'] = self.request.GET['next']
         # scope = "send|balance|funding|transactions|accountinfofull"
         scope = "send|accountinfofull|funding"
+        set_constants()
         auth_url = oauth.genauthurl(redirect=redirect_uri, scope=scope)
         data['auth_url'] = auth_url
         data['site_name'] = Site.objects.get().name
