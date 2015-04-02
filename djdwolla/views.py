@@ -13,12 +13,12 @@ from .auth import DWOLLA_ACCOUNT
 
 from .mixins import LoginRequiredMixin
 from .forms import PinForm
-from .models import Customer, TransactionStatus  # , RequestFulfilled, EventProcessingException
+from .models import Customer
 from .settings import PY3
 from djstripe.models import Event, EventProcessingException
-import urllib
 from django.contrib import messages
 from delorean import Delorean
+from datetime import timedelta
 
 
 logger = logging.getLogger("devote.debug")
@@ -89,6 +89,8 @@ class OAuthConfirmationView(LoginRequiredMixin, generic.UpdateView):
         messages.info(self.request,
                       "Your pin is confirmed, and your Dwolla account is now authorized.")
         del self.request.session['dwolla_funds_source_choices']
+        form.instance.token_expiration = Delorean().datetime + timedelta(minutes=55)
+        form.instance.refresh_token_expiration = Delorean().datetime + timedelta(days=30)
         return super(OAuthConfirmationView, self).form_valid(form)
 
     def get_form_kwargs(self):
