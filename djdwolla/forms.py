@@ -1,10 +1,8 @@
 from django import forms
-from django.contrib import messages
-from .models import Customer
 
+from .models import Customer
 from .auth import DWOLLA_ACCOUNT
 from .tasks import send_funds
-from dwolla import constants, fundingsources
 
 
 class PinForm(forms.ModelForm):
@@ -35,15 +33,9 @@ class PinForm(forms.ModelForm):
         return data
 
     def clean(self):
-        warning_message = ('You have chosen your Dwolla balance for you funding '
-                           'source and the balance is less than $1.00.  Be sure '
-                           'to fund the account balance immediately so we can '
-                           'process payment for your subscriptions on the first '
-                           'of next month.')
         cleaned_data = super(PinForm, self).clean()
         data = cleaned_data['pin']
         token = cleaned_data['token']
-        funds_source = cleaned_data['funds_source']
         if not data.isdigit():
             self.add_error('pin', "The PIN must only contain numbers")
         else:
@@ -57,11 +49,12 @@ class PinForm(forms.ModelForm):
                 This is a hack because Dwolla doesn't have
                 an API call to verify a PIN
                 """
-                if e.message == 'Invalid account PIN':
-                    self.add_error('pin', e.message)
-                elif "Invalid funding source provided" in e.message:
-                    if funds_source == "Balance" and \
-                       fundingsources.info("Balance", alternate_token=token)["Balance"] < 1:
-                        messages.warning(self.request, warning_message, extra_tags='sticky')
+                if "dwolla-python: An API error" in e.message:
+                    if 'Invalid account PIN' in e.message:
+                        self.add_error('pin', 'Invalid account PIN')
+                    elif "Invalid funding source provided" in e.message:
+                        pass
+                    else:
+                        raise
                 else:
                     raise

@@ -16,7 +16,9 @@
   </head>
 <body style="padding:0px 50px">
 
-<h1>Enter your Dwolla PIN</h1>
+  <h1>Enter your Dwolla PIN</h1>
+
+  {% include "form_errors.html" %}
 <form action="{% url 'djdwolla:oauth_conf' %}" method="post">
   {% csrf_token %}
   <div {% if form.pin_auth.errors %} class="has-error" {% endif %}>
@@ -29,13 +31,11 @@
 	{{ form.funds_source }}
       </div>
     </div>
-    <div class="col-md-2">
+    <div class="col-md-2 {% if form.pin.errors %} has-error {% endif %}">
       <div class="input-group">
 	<span class="input-group-addon">PIN</span>
 	{{ form.pin }}
       </div>
-      <br />
-      {{ form.pin.errors }}
       {% for f in form.hidden_fields %}
       {{ f }}
       {% endfor %}

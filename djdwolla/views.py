@@ -70,7 +70,8 @@ class OAuthConfirmationView(LoginRequiredMixin, generic.UpdateView):
     template_name = "pin_form.html"
     form_class = PinForm
     success_url = "/dwolla/pin_confirmed/"
-
+    constants = set_constants()
+    
     def get_object(self):
         if hasattr(self.request.user, "dwolla_customer"):
             customer = self.request.user.dwolla_customer
@@ -80,7 +81,7 @@ class OAuthConfirmationView(LoginRequiredMixin, generic.UpdateView):
 
     def get_token(self):
         code = self.request.GET['code']
-        constants = set_constants()
+        constants = self.constants
         from dwolla import oauth
         dwolla_resp = oauth.get(code)
         return dwolla_resp
@@ -91,6 +92,20 @@ class OAuthConfirmationView(LoginRequiredMixin, generic.UpdateView):
         del self.request.session['dwolla_funds_source_choices']
         form.instance.token_expiration = Delorean().datetime + timedelta(minutes=55)
         form.instance.refresh_token_expiration = Delorean().datetime + timedelta(days=30)
+        funds_source = form.cleaned_data['funds_source']
+        constants = self.constants
+        from dwolla import fundingsources
+        
+        warning_message = ('You chose your Dwolla balance for your funding '
+                           'source and the balance is less than $1.00.  Be sure '
+                           'to fund the account balance immediately so we can '
+                           'process payment for your subscriptions on the first '
+                           'of next month.')
+
+        if funds_source == "Balance" and fundingsources.info(
+                "Balance", alternate_token=form.instance.token)["Balance"] < 1:
+            messages.warning(self.request, warning_message, extra_tags='sticky')
+
         return super(OAuthConfirmationView, self).form_valid(form)
 
     def get_form_kwargs(self):
@@ -104,7 +119,7 @@ class OAuthConfirmationView(LoginRequiredMixin, generic.UpdateView):
             tokens = self.get_token()
             access_token = tokens['access_token']
             refresh_token = tokens['refresh_token']
-            constants = set_constants()
+            constants = self.constants
             from dwolla import accounts, fundingsources
             dwolla_id = accounts.full(alternate_token=access_token)['Id']
             funding_sources = fundingsources.get(alternate_token=access_token)
