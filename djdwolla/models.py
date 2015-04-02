@@ -8,6 +8,7 @@ from .managers import CustomerManager
 # from .tasks import send_funds
 from model_utils.models import TimeStampedModel
 from delorean import Delorean
+from datetime import timedelta
 from jsonfield.fields import JSONField
 
 from django.conf import settings
@@ -117,7 +118,8 @@ class Customer(DwollaObject):
     card_kind = models.CharField(max_length=50, blank=True)
     date_purged = models.DateTimeField(null=True, editable=False)
     token_expiration = models.DateTimeField(null=True)
-
+    refresh_token_expiration = models.DateTimeField(null=True)
+    
     objects = CustomerManager()
 
     def __str__(self):
@@ -135,17 +137,19 @@ class Customer(DwollaObject):
         cus = Customer.objects.create(user=user)
         return cus
 
-    def get_token(self):
+    def get_token(self, constants=constants):
         if self.token_expiration <= Delorean().datetime:
-            token = self.update_tokens()
-        return token
+            self.update_tokens(constants)
+        return self.token
 
-    def update_tokens(self, constants=constants):
+    def update_tokens(self, constants):
         from dwolla import oauth
         resp = oauth.refresh(self.refresh_token)
         self.refresh_token = resp['refresh_token']
         self.token = resp['access_token']
-        self.save(update_fields=['token', 'refresh_token'])
+        self.token_expiration = Delorean().datetime + timedelta(minutes=55)
+        self.refresh_token_expiration = Delorean().datetime + timedelta(days=30)
+        self.save()
         return self.token
 
     # def send_funds(self, amount, notes, pin=None, funds_source=None):
